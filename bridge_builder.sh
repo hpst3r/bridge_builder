@@ -32,7 +32,7 @@ fi
 # slave physical interfaces to the bond
 for interface in "${interfaces[@]}"; do
   
-  connection_is_mastered=$(nmcli con sh "$interface" | grep master)
+  connection_is_mastered=$(nmcli con sh enp1s0f0 | grep -E "master:.*[^-]$")
   
   if [[ ! "$connection_is_mastered" ]]; then
 
