@@ -16,7 +16,7 @@ if [[ ! "$bond_exists" ]]; then
   echo "Bond '${bond_name}' was not found - creating it."  
 
   # create the bond
-  nmcli con add type bond \
+  sudo nmcli con add type bond \
     con-name "$bond_name" \
     ifname "$bond_name" \
     bond.options "mode=802.3ad" \
@@ -32,15 +32,17 @@ fi
 # slave physical interfaces to the bond
 for interface in "${interfaces[@]}"; do
   
-  connection_is_mastered=$(nmcli con sh enp1s0f0 | grep -E "master:.*[^-]$")
+  connection_is_mastered=$(nmcli con sh "$interface" | grep -E "master:.*[^-]$")
   
   if [[ ! "$connection_is_mastered" ]]; then
 
     echo "Interface '${interface}' is not mastered by bond '${bond_name}' - slaving it."
 
-    nmcli con mod "$interface" \
+    sudo nmcli con mod "$interface" \
       slave-type bond \
       master "$bond_name"
+
+    echo "Slaved interface '${interface}' to bond '${bond_name}'."
 
   else
     
@@ -64,20 +66,24 @@ for vlan in "${vlans[@]}"; do
     bridge_name="bridge${vlan}"
   
     # add a disassociated bridge
-    nmcli con add type bridge \
+    sudo nmcli con add type bridge \
       con-name "$bridge_name" \
       ifname "$bridge_name" \
       ipv4.method disabled \
       ipv6.method ignore
+
+    echo "Created bridge '${bridge_name}'."
   
     # add desired vlan to bond, slave it to the bridge
-    nmcli con add type vlan \
+    sudo nmcli con add type vlan \
       con-name "$vlan_name" \
       ifname "$bond_name"."$vlan" \
       dev "$bond_name" \
       id "$vlan" \
       master "$bridge_name" \
       slave-type bridge
+
+    echo "Created VLAN ${vlan} connection '${vlan_name}' as slave to bridge '${bridge_name}'."
 
   else
 
