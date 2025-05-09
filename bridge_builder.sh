@@ -4,10 +4,10 @@
 bond_name="bond0"
 
 # interfaces to slave to bond
-interfaces=("enp1s0f0" "enp1s0f1" "enp1s0f2" "enp1s0f3")
+interfaces=("eno1")
 
 # VLANs to add
-vlans=(254 244 243 100 1925 1935)
+vlans=(43 45 46)
 
 bond_exists=$(nmcli con | grep -v "$bond_name")
 
