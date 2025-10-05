@@ -4,14 +4,15 @@
 bond_name="bond0"
 
 # interfaces to slave to bond
-interfaces=("enp1s0f0" "enp1s0f1")
+interfaces=("enp1s0f0" "enp1s0f1" "enp1s0f2" "enp1s0f3")
 
 # VLANs to add
-vlans=(41 42 43 45 46 55)
+vlans=(2 11 12 200 254 901 999)
 
-bond_exists=$(nmcli con | grep "$bond_name")
+nmcli con | grep -q "$bond_name"
+bond_exists=$?
 
-if [[ ! "$bond_exists" ]]; then
+if [[ bond_exists -ne 0 ]]; then
 
   echo "Bond '${bond_name}' was not found - creating it."
 
@@ -32,9 +33,21 @@ fi
 # slave physical interfaces to the bond
 for interface in "${interfaces[@]}"; do
 
-  connection_is_mastered=$(nmcli con sh "$interface" | grep -E "master:.*${bond_name}[^-]$")
+  nmcli con sh "$interface" 2> /dev/null | grep -qE "$interface"
+  interface_exists=$?
 
-  if [[ ! "$connection_is_mastered" ]]; then
+  if [[ interface_exists -ne 0 ]]; then
+  
+    echo "Connection '${interface}' does not exist. Creating new connection for interface '${interface}'."
+
+    sudo nmcli con add type ethernet ifname "$interface" con-name "$interface" save yes autoconnect yes
+
+  fi
+
+  nmcli con sh "$interface" | grep -qE "master:[[:space:]]*${bond_name}[[:space:]]*$"
+  connection_mastered=$?
+
+  if [[ connection_mastered -ne 0 ]]; then
 
     echo "Interface '${interface}' is not mastered by bond '${bond_name}' - slaving it."
 
@@ -57,15 +70,18 @@ for vlan in "${vlans[@]}"; do
 
   vlan_name="vlan${vlan}"
 
-  vlan_exists=$(nmcli con | grep "$vlan_name")
+  nmcli con | grep -q "$vlan_name"
+  vlan_exists=$?
 
-  if [[ ! "$vlan_exists" ]]; then
+  bridge_name="bridge${vlan}"
 
-    echo "VLAN ${vlan} connection '${vlan_name}' does not exist. Creating it and its bridge."
+  nmcli con | grep -q "$bridge_name"
+  bridge_exists=$?
 
-    bridge_name="bridge${vlan}"
+  if [[ bridge_exists -ne 0 ]]; then
 
-    # add a disassociated bridge
+    echo "Bridge ${vlan} connection '${bridge_name}' does not exist. Creating it."
+
     sudo nmcli con add type bridge \
       con-name "$bridge_name" \
       ifname "$bridge_name" \
@@ -73,6 +89,16 @@ for vlan in "${vlans[@]}"; do
       ipv6.method ignore
 
     echo "Created bridge '${bridge_name}'."
+
+  else
+
+    echo "Bridge ${vlan} connection '${bridge_name}' already exists - no changes were made."
+
+  fi
+
+  if [[ vlan_exists -ne 0 ]]; then
+
+    echo "VLAN ${vlan} connection '${vlan_name}' does not exist. Creating it."
 
     # add desired vlan to bond, slave it to the bridge
     sudo nmcli con add type vlan \
